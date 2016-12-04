@@ -15,5 +15,6 @@
     <description lang="sk">Sledujte online archiv a vysielanie TV Lux</description>
     <description lang="sk">Sledujte online archiv a vysilani TV Lux</description>
     <platform>all</platform>
+    <source>https://github.com/janciga/plugin.video.tv.lux</source>
   </extension>
 </addon>
