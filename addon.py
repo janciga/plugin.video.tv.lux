@@ -8,7 +8,7 @@ import xbmcprovider, xbmcaddon, xbmcutil, xbmcgui, xbmcplugin, xbmc
 import util
 
 #TODO check setting in the wiki
-__scriptid__ = 'plugin.video.tv.lux'
+__scriptid__ = 'plugin.video.tv.lux.sk'
 __scriptname__ = 'tvlux'
 __addon__ = xbmcaddon.Addon(id=__scriptid__)
 __language__ = __addon__.getLocalizedString
