@@ -2,6 +2,7 @@ import cookielib
 import urllib2
 import urlparse
 import re
+import time
 
 import util
 from provider import ContentProvider
@@ -32,6 +33,7 @@ class TVLuxContentProvider(ContentProvider):
         item = self.video_item()
         item['title'] = 'TV Lux Live'
         item['url'] = self.base_url + "nazivo/#live"
+        item['year'] = time.strftime("%Y")
         result.append(item)
 
         # the second category is directory item pointing to list of programs from archive
