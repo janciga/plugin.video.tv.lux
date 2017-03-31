@@ -9,6 +9,8 @@ from provider import ContentProvider
 
 class TVLuxContentProvider(ContentProvider):
     DATE_REGEX = re.compile("^[0-9]+\.[0-9]+\.[0-9]+$")
+    listing_iter_re = re.compile(r"""<a\ .*href=\"(?P<url>[^\"]+)\".*>""")
+    pager_begin = '<div class="pager">'
 
     def __init__(self, username=None, password=None, filter=None, tmp_dir='/tmp'):
         ContentProvider.__init__(self, 'tvlux', 'http://www.tvlux.sk/', username, password, filter, tmp_dir)
@@ -38,6 +40,152 @@ class TVLuxContentProvider(ContentProvider):
 
         # the second category is directory item pointing to list of programs from archive
         result.append(self.dir_item('Archiv', self.base_url + 'videoarchiv#mycat'))
+
+        # directory item - list of new videos
+        result.append(self.dir_item("Nove", self.base_url + 'videoarchiv#nove'))
+
+        # directory item - list of most viewed videos
+        result.append(self.dir_item("Najviac pozerane", self.base_url + 'videoarchiv#pozerane'))
+        return result
+
+
+    def _list_mycat(self, page):
+        # this is just archive page, need to list all TV programs
+        result = []
+        prog_list_start = '<select id="archivSelectRel"'
+        prog_select = util.substr(page, prog_list_start, '</select>')
+        for m in re.finditer('<option\ value=\"(?P<id>\d+)\">(?P<title>[^<]+)</option>', prog_select):
+            # filter out categories with invalid ID
+            try:
+                int(m.group('id'))
+            except ValueError:
+                continue
+
+            item = self.dir_item()
+            # set url with markup #program
+            item['url'] = self.base_url + \
+                          "archiv/listing/&type=relacia&id=" + \
+                          m.group('id') + \
+                          "#program"
+            item['title'] = m.group('title')
+            self._filter(result, item)
+        return result
+
+    def _resolve_parts(self, part_list):
+        result = []
+
+        # walk all parts listed
+        for part in part_list:
+            url_match = re.search(self.listing_iter_re, part)
+            if not url_match:
+                continue
+
+            item = self.video_item()
+            item['url'] = url_match.group('url')
+            item['title_num'] = "0"
+            item['date'] = "0.0.0"
+            info_list = part.split("\n")
+
+            # walk information about the current video
+            for info in info_list:
+                info = info.strip()
+                if info.startswith('<div class="archiveItemTitle">'):
+                    # set title and parse the part number from the title (the number is used for sorting)
+                    title = info[info.find(">") + 1:info.rfind("<")]
+                    item["title"] = title
+                    left = title.find('(')
+                    right = title.find(')')
+                    if left >= 0 and left < right:
+                        num = title[(left + 1): right]
+                        try:
+                            num = int(num)
+                            item['title_num'] = "%05d" % num
+                        except ValueError:
+                            # invalid value
+                            item['title_num'] = num
+                    else:
+                        item['title_num'] = ''
+                elif info.startswith('<div class="archiveItemDesc">'):
+                    # set description
+                    item["plot"] = info[info.find(">") + 1:info.rfind("<")]
+                elif info.startswith('<div class="date">'):
+                    # set data (for sorting purposes only)
+                    info_date = info[info.find(">") + 1: info.rfind("<")]
+                    if self.DATE_REGEX.match(info_date):
+                        item["date"] = info_date
+                        item["year"] = info_date.split(".")[2]
+
+            self._filter(result, item)
+
+        return result
+
+    def _sort_programs(self, result):
+        # Sort results according to found information used in this order:
+        #   1. Number from the video title (if exists)
+        #   2. Date (in reverse format -> yyyy.mm.dd)
+        #   3. Title (lower case)
+        result = sorted(result, key=lambda x: ((x['title_num']) +
+                                               (str.join(".", x['date'].split(".")[::-1])) +
+                                               (x['title'].lower())), reverse=True)
+        return result
+
+    def _resolve_pager(self, page, result):
+        # Parse and store URL to next listing page if exists
+        pages = util.substr(page, '<div class="pages">', '</div>')
+        next_page_match = re.search(r'<a href="(?P<url>[^"]+)" class="nextPage active"', pages)
+        if next_page_match:
+            self.info("Next page match URL: " + next_page_match.group('url').replace('&amp;', '&'))
+            item = self.dir_item()
+            item['type'] = 'next'
+            item['url'] = next_page_match.group('url').replace('&amp;', '&') + "#program"
+            item['title'] = "Dalsie"
+            self._filter(result, item)
+
+    def _list_program(self, page):
+        # need to list all parts of the same program
+        part_list_start = '<div class="archivListing">'
+        part_list = util.substr(page, part_list_start, self.pager_begin)
+        part_list = part_list.split("</a>")
+
+        result = self._resolve_parts(part_list)
+        result = self._sort_programs(result)
+
+        self._resolve_pager(page, result)
+        return result
+
+    def _sort_nove(self, result):
+        # Sort results according to found information used in this order:
+        #   1. Date (in reverse format -> yyyy.mm.dd)
+        #   2. Title (lower case)
+        result = sorted(result, key=lambda x: ((str.join(".", x['date'].split(".")[::-1])) +
+                                               (x['title'].lower())), reverse=True)
+        return result
+
+    def _list_nove(self, page):
+        result = []
+        page = util.substr(page, '<div class="tab" id="tabcontent-4">', '<div class="programBanners">')
+
+        part_list_start = '<div class="archivListing">'
+        part_list = util.substr(page, part_list_start, self.pager_begin)
+        part_list = part_list.split("</a>")
+
+        result = self._resolve_parts(part_list)
+        result = self._sort_nove(result)
+
+        self._resolve_pager(page, result)
+        return result
+
+    def _list_pozerane(self, page):
+        result = []
+        page = util.substr(page, '<div class="tab" id="tabcontent-3">', '<div class="tab" id="tabcontent-4">')
+
+        part_list_start = '<div class="archivListing">'
+        part_list = util.substr(page, part_list_start, self.pager_begin)
+        part_list = part_list.split("</a>")
+
+        result = self._resolve_parts(part_list)
+        # not needed to sort ?
+        self._resolve_pager(page, result)
         return result
 
     ##
@@ -50,98 +198,21 @@ class TVLuxContentProvider(ContentProvider):
             # remove markup from the URL
             url=url[:url.find("#")]
 
-        result = []
         page = util.request(url)
-        if purl.fragment == "mycat":
-            # this is just archive page, need to list all TV programs
-            prog_list_start = '<select id="archivSelectRel"'
-            prog_select = util.substr(page, prog_list_start, '</select>')
-            for m in re.finditer('<option\ value=\"(?P<id>\d+)\">(?P<title>[^<]+)</option>', prog_select):
-                # filter out categories with invalid ID
-                try:
-                    int(m.group('id'))
-                except ValueError:
-                    continue
 
-                item = self.dir_item()
-                # set url with markup #program
-                item['url'] = self.base_url +\
-                                "archiv/listing/&type=relacia&id=" +\
-                                m.group('id') +\
-                                "#program"
-                item['title'] = m.group('title')
-                self._filter(result, item)
+        if purl.fragment == "mycat":
+            return self._list_mycat(page)
 
         elif purl.fragment == "program":
-            # need to list all parts of the same program
-            part_list_start = '<div class="archivListing">'
-            part_list = util.substr(page, part_list_start, '<div class="pager">')
-            listing_iter_re = r"""<a\ .*href=\"(?P<url>[^\"]+)\".*>"""
-            part_list = part_list.split("</a>")
+            return self._list_program(page)
 
-            # walk all parts listed
-            for part in part_list:
-                url_match = re.search(listing_iter_re, part)
-                if not url_match:
-                    continue
+        elif purl.fragment == "nove":
+            return self._list_nove(page)
 
-                item = self.video_item()
-                item['url'] = url_match.group('url')
-                item['title_num'] = "0"
-                item['date'] = "0.0.0"
-                info_list = part.split("\n")
+        elif purl.fragment == "pozerane":
+            return self._list_pozerane(page)
 
-                # walk information about the current video
-                for info in info_list:
-                    info = info.strip()
-                    if info.startswith('<div class="archiveItemTitle">'):
-                        # set title and parse the part number from the title (the number is used for sorting)
-                        title = info[info.find(">") + 1:info.rfind("<")]
-                        item["title"] = title
-                        left = title.find('(')
-                        right = title.find(')')
-                        if left >= 0 and left < right:
-                            num = title[(left + 1) : right]
-                            try:
-                                num = int(num)
-                                item['title_num'] = "%05d" % num
-                            except ValueError:
-                                # invalid value
-                                item['title_num'] = num
-                        else:
-                            item['title_num'] = ''
-                    elif info.startswith('<div class="archiveItemDesc">'):
-                        # set description
-                        item["plot"] = info[info.find(">") + 1:info.rfind("<")]
-                    elif info.startswith('<div class="date">'):
-                        # set data (for sorting purposes only)
-                        info_date = info[info.find(">") + 1 : info.rfind("<")]
-                        if self.DATE_REGEX.match(info_date):
-                            item["date"] = info_date
-                            item["year"] = info_date.split(".")[2]
-
-                self._filter(result, item)
-
-            # Sort results according to found information used in this order:
-            #   1. Number from the video title (if exists)
-            #   2. Date (in reverse format -> yyyy.mm.dd)
-            #   3. Title (lower case)
-            result = sorted(result, key=lambda x: ((x['title_num']) +
-                                                   (str.join(".", x['date'].split(".")[::-1])) +
-                                                   (x['title'].lower())), reverse=True)
-
-            # Parse and store URL to next listing page if exists
-            pages = util.substr(page, '<div class="pages">', '</div>')
-            next_page_match = re.search(r'<a href="(?P<url>[^"]+)" class="nextPage active"', pages)
-            if next_page_match :
-                self.info("Next page match URL: " + next_page_match.group('url').replace('&amp;', '&'))
-                item = self.dir_item()
-                item['type'] = 'next'
-                item['url'] = next_page_match.group('url').replace('&amp;', '&') + "#program"
-                item['title'] = "Dalsie"
-                self._filter(result, item)
-
-        return result
+        return []
 
     ##
     # Method is called for video items, can be used to provide multiple choices
