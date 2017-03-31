@@ -7,6 +7,7 @@ import util
 from provider import ContentProvider
 
 class TVLuxContentProvider(ContentProvider):
+    DATE_REGEX = re.compile("^[0-9]+\.[0-9]+\.[0-9]+$")
 
     def __init__(self, username=None, password=None, filter=None, tmp_dir='/tmp'):
         ContentProvider.__init__(self, 'tvlux', 'http://www.tvlux.sk/', username, password, filter, tmp_dir)
@@ -84,6 +85,8 @@ class TVLuxContentProvider(ContentProvider):
 
                 item = self.video_item()
                 item['url'] = url_match.group('url')
+                item['title_num'] = "0"
+                item['date'] = "0.0.0"
                 info_list = part.split("\n")
 
                 # walk information about the current video
@@ -93,8 +96,10 @@ class TVLuxContentProvider(ContentProvider):
                         # set title and parse the part number from the title (the number is used for sorting)
                         title = info[info.find(">") + 1:info.rfind("<")]
                         item["title"] = title
-                        if title.find('(') and title.find(')'):
-                            num = title[title.find('(') + 1 : title.rfind(')')]
+                        left = title.find('(')
+                        right = title.find(')')
+                        if left >= 0 and left < right:
+                            num = title[(left + 1) : right]
                             try:
                                 num = int(num)
                                 item['title_num'] = "%05d" % num
@@ -108,15 +113,20 @@ class TVLuxContentProvider(ContentProvider):
                         item["plot"] = info[info.find(">") + 1:info.rfind("<")]
                     elif info.startswith('<div class="date">'):
                         # set data (for sorting purposes only)
-                        item["date"] = info[info.find(">") + 1 : info.rfind("<")]
+                        info_date = info[info.find(">") + 1 : info.rfind("<")]
+                        if self.DATE_REGEX.match(info_date):
+                            item["date"] = info_date
+                            item["year"] = info_date.split(".")[2]
 
                 self._filter(result, item)
 
             # Sort results according to found information used in this order:
             #   1. Number from the video title (if exists)
-            #   2. Date
+            #   2. Date (in reverse format -> yyyy.mm.dd)
             #   3. Title (lower case)
-            result = sorted(result, key=lambda x: ((x['title_num']) + (x['date']) + (x['title'].lower())), reverse=True)
+            result = sorted(result, key=lambda x: ((x['title_num']) +
+                                                   (str.join(".", x['date'].split(".")[::-1])) +
+                                                   (x['title'].lower())), reverse=True)
 
             # Parse and store URL to next listing page if exists
             pages = util.substr(page, '<div class="pages">', '</div>')
