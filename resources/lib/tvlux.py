@@ -39,7 +39,7 @@ class TVLuxContentProvider(ContentProvider):
         result.append(item)
 
         # the second category is directory item pointing to list of programs from archive
-        result.append(self.dir_item('Archiv', self.base_url + 'videoarchiv#mycat'))
+        result.append(self.dir_item('Relacie', self.base_url + 'videoarchiv#mycat'))
 
         # directory item - list of new videos
         result.append(self.dir_item("Nove", self.base_url + 'videoarchiv#nove'))
@@ -50,7 +50,7 @@ class TVLuxContentProvider(ContentProvider):
 
 
     def _list_mycat(self, page):
-        # this is just archive page, need to list all TV programs
+        # this is just Relacie page, need to list all TV programs
         result = []
         prog_list_start = '<select id="archivSelectRel"'
         prog_select = util.substr(page, prog_list_start, '</select>')
@@ -144,7 +144,7 @@ class TVLuxContentProvider(ContentProvider):
     def _list_program(self, page):
         # need to list all parts of the same program
         part_list_start = '<div class="archivListing">'
-        part_list = util.substr(page, part_list_start, self.pager_begin)
+        part_list = util.substr(page, part_list_start, '<div class="clr"></div>')
         part_list = part_list.split("</a>")
 
         result = self._resolve_parts(part_list)
