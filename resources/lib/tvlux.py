@@ -26,6 +26,13 @@ class TVLuxContentProvider(ContentProvider):
                 'resolve',
                 '!download']
 
+    def normalize_url(self, url):
+        if url.startswith("//"):
+            return "http:" + url
+        elif url.startswith("/"):
+            return "http:/" + url
+        return url
+
     ##
     #  Initial screen showing categories
     def categories(self):
@@ -45,7 +52,7 @@ class TVLuxContentProvider(ContentProvider):
         result.append(self.dir_item("Nove", self.base_url + 'videoarchiv#nove'))
 
         # directory item - list of most viewed videos
-        result.append(self.dir_item("Najviac pozerane", self.base_url + 'videoarchiv#pozerane'))
+        result.append(self.dir_item("Najpozeranejsie", self.base_url + 'videoarchiv#pozerane'))
         return result
 
 
@@ -63,10 +70,10 @@ class TVLuxContentProvider(ContentProvider):
 
             item = self.dir_item()
             # set url with markup #program
-            item['url'] = self.base_url + \
-                          "archiv/listing/&type=relacia&id=" + \
-                          m.group('id') + \
-                          "#program"
+            item['url'] = self.normalize_url(self.base_url + \
+                                             "archiv/listing/&type=relacia&id=" + \
+                                             m.group('id') + \
+                                             "#program")
             item['title'] = m.group('title')
             self._filter(result, item)
         return result
@@ -81,7 +88,7 @@ class TVLuxContentProvider(ContentProvider):
                 continue
 
             item = self.video_item()
-            item['url'] = url_match.group('url')
+            item['url'] = self.normalize_url(url_match.group('url'))
             item['title_num'] = "0"
             item['date'] = "0.0.0"
             info_list = part.split("\n")
@@ -137,7 +144,7 @@ class TVLuxContentProvider(ContentProvider):
             self.info("Next page match URL: " + next_page_match.group('url').replace('&amp;', '&'))
             item = self.dir_item()
             item['type'] = 'next'
-            item['url'] = next_page_match.group('url').replace('&amp;', '&') + "#program"
+            item['url'] = self.normalize_url(next_page_match.group('url').replace('&amp;', '&') + "#program")
             item['title'] = "Dalsie"
             self._filter(result, item)
 
@@ -146,7 +153,6 @@ class TVLuxContentProvider(ContentProvider):
         part_list_start = '<div class="archivListing">'
         part_list = util.substr(page, part_list_start, '<div class="clr"></div>')
         part_list = part_list.split("</a>")
-
         result = self._resolve_parts(part_list)
         result = self._sort_programs(result)
 
@@ -241,6 +247,6 @@ class TVLuxContentProvider(ContentProvider):
         video_tag = util.substr(video_page, '<video>', '</video>')
         video_re = r"""<source.*src=\"(?P<url>[^\"]+)\".*>"""
         match = re.search(video_re, video_tag)
-        item['url'] = match.group('url')
+        item['url'] = self.normalize_url(match.group('url'))
 
         return item
