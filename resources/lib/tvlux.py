@@ -96,7 +96,7 @@ class TVLuxContentProvider(ContentProvider):
             # walk information about the current video
             for info in info_list:
                 info = info.strip()
-                if info.startswith('<div class="archiveItemTitle" itemprop="name">'):
+                if "archiveItemTitle" in info:  # startswith('<div class="archiveItemTitle" itemprop="name">'):
                     # set title and parse the part number from the title (the number is used for sorting)
                     title = info[info.find(">") + 1:info.rfind("<")]
                     item["title"] = title
@@ -112,9 +112,12 @@ class TVLuxContentProvider(ContentProvider):
                             item['title_num'] = num
                     else:
                         item['title_num'] = ''
-                elif info.startswith('<div class="archiveItemDesc">'):
+                elif "archiveItemDesc" in info:  #.startswith('<div class="archiveItemDesc">'):
                     # set description
                     item["plot"] = info[info.find(">") + 1:info.rfind("<")]
+                elif 'itemprop="image"' in info:
+                    info = info[info.find('src="') + 5 : ]
+                    item["img"] = info[ : info.find('"')]
                 elif info.startswith('<div class="date">'):
                     # set data (for sorting purposes only)
                     info_date = info[info.find(">") + 1: info.rfind("<")]
