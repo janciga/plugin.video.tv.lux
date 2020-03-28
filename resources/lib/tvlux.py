@@ -96,7 +96,7 @@ class TVLuxContentProvider(ContentProvider):
             # walk information about the current video
             for info in info_list:
                 info = info.strip()
-                if info.startswith('<div class="archiveItemTitle">'):
+                if info.startswith('<div class="archiveItemTitle" itemprop="name">'):
                     # set title and parse the part number from the title (the number is used for sorting)
                     title = info[info.find(">") + 1:info.rfind("<")]
                     item["title"] = title
