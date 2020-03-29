@@ -234,8 +234,8 @@ class TVLuxContentProvider(ContentProvider):
             url=url[:url.find("#")]
 
         # prepare new video item
-        item = self.video_item()
-        item['surl'] = item['title']
+        video_item = self.video_item()
+        video_item['surl'] = item['title']
         video_page = util.request(url)
 
         if purl.fragment == "live":
@@ -243,13 +243,16 @@ class TVLuxContentProvider(ContentProvider):
             liveMobile = util.substr(video_page, '<div id="mobileDeviceSwitch">', '</div>')
             stream_re = r"""<a class=\"android\" href=\"(?P<url>[^\"]+)\""""
             match = re.search(stream_re, liveMobile)
-            item['url'] = match.group('url')
-            return item
+            video_item['url'] = match.group('url')
+            return video_item
 
         # resolve video of program from archive
-        video_tag = util.substr(video_page, '<video>', '</video>')
-        video_re = r"""<source.*src=\"(?P<url>[^\"]+)\".*>"""
-        match = re.search(video_re, video_tag)
-        item['url'] = self.normalize_url(match.group('url'))
+        # video_tag = util.substr(video_page, '<video>', '</video>')
+        # video_re = r"""<source.*src=\"(?P<url>[^\"]+)\".*>"""
+        # match = re.search(video_re, video_tag)
+        # video_item['url'] = self.normalize_url(match.group('url'))
 
-        return item
+        srcurl = util.substr(video_page, '"sourceURL":"http', '"\n')
+        video_item['url'] = srcurl[srcurl.find('http'):]
+
+        return video_item
