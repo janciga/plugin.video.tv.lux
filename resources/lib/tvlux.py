@@ -3,6 +3,7 @@ import urllib2
 import urlparse
 import re
 import time
+import random
 
 import util
 from provider import ContentProvider
@@ -13,7 +14,7 @@ class TVLuxContentProvider(ContentProvider):
     pager_begin = '<div class="pager">'
 
     def __init__(self, username=None, password=None, filter=None, tmp_dir='/tmp'):
-        ContentProvider.__init__(self, 'tvlux', 'http://www.tvlux.sk/', username, password, filter, tmp_dir)
+        ContentProvider.__init__(self, 'tvlux', 'https://www.tvlux.sk/', username, password, filter, tmp_dir)
         self.cp = urllib2.HTTPCookieProcessor(cookielib.LWPCookieJar())
         self.init_urllib()
 
@@ -41,8 +42,8 @@ class TVLuxContentProvider(ContentProvider):
         # the first category is video item pointing to live stream
         item = self.video_item()
         item['title'] = 'TV Lux Live'
-        item['url'] = self.base_url + "nazivo/#live"
-        item['year'] = time.strftime("%Y")
+        item['url'] = 'http://www.tvlux.sk/nazivo/'
+        item['year'] = time.strftime('%Y')
         result.append(item)
 
         # the second category is directory item pointing to list of programs from archive
@@ -238,12 +239,16 @@ class TVLuxContentProvider(ContentProvider):
         video_item['surl'] = item['title']
         video_page = util.request(url)
 
-        if purl.fragment == "live":
-            # resolve live video
-            liveMobile = util.substr(video_page, '<div id="mobileDeviceSwitch">', '</div>')
-            stream_re = r"""<a class=\"android\" href=\"(?P<url>[^\"]+)\""""
-            match = re.search(stream_re, liveMobile)
-            video_item['url'] = match.group('url')
+        if purl.path == '/nazivo/':
+            index = random.randint(0, 2)
+
+            if index == 0:
+                video_item['url'] = 'http://stream.tvlux.sk/lux/ngrp:lux.stream_all/playlist.m3u8'
+            elif index == 1:
+                video_item['url'] = 'http://stream2.tvlux.sk/lux/ngrp:lux.stream_all/playlist.m3u8'
+            else:
+                video_item['url'] = 'http://stream3.tvlux.sk/lux/ngrp:lux.stream_all/playlist.m3u8'
+
             return video_item
 
         # resolve video of program from archive
