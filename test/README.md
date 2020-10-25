@@ -15,3 +15,4 @@
 	- ~/.kodi/addons/script.module.beautifulsoup4/lib
 	- In PyCharm: File -> Settings -> Project -> Project Interpreter -> (Settings button) -> Show All -> (Show alll... button)
 - Now you can run tv-lux-plugin-test.py and use pdb
+- Check logs (if --debug enabled) in: ~/.kodi/temp/kodi.log
