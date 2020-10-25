@@ -257,7 +257,12 @@ class TVLuxContentProvider(ContentProvider):
         # match = re.search(video_re, video_tag)
         # video_item['url'] = self.normalize_url(match.group('url'))
 
-        srcurl = util.substr(video_page, '"sourceURL":"http', '"\n')
-        video_item['url'] = srcurl[srcurl.find('http'):]
+        # srcurl = util.substr(video_page, '"sourceURL":"http', '"\n')
+        # video_item['url'] = srcurl[srcurl.find('http'):]
+
+        srcurl = util.substr(video_page, 'newSource.src', ';')
+        apostrophe = "'"
+        if srcurl.count(apostrophe) == 2:
+            video_item['url'] = srcurl[srcurl.find(apostrophe) + 1: srcurl.rfind(apostrophe)]
 
         return video_item
